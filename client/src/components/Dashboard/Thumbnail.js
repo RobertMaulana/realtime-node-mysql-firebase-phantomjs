@@ -3,6 +3,7 @@ import {
   View,
   Text
 } from 'react-native';
+import { Container, Header, Content, Card, CardItem, Thumbnail, Button, Icon, Left, Body, Right } from 'native-base';
 
 import { connect } from 'react-redux';
 import { onlineRegistration } from '../../actions';
@@ -16,6 +17,17 @@ var config = {
   storageBucket    : "pasarpolis-api-monitoring.appspot.com",
   messagingSenderId: "987718083796"
 };
+
+const styles = {
+  title: {
+    fontSize: 20,
+    margin: 20
+  },
+  count: {
+    fontSize: 40,
+    margin: 10
+  }
+}
 
 class ThumbnailApp extends Component {
   constructor(props) {
@@ -42,9 +54,13 @@ class ThumbnailApp extends Component {
 
   render() {
     return(
-          <View style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-            <Text>{this.state.value}</Text>
-          </View>
+              <Card style={{height: 200}}>
+                <View style={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                  <Text style={styles.title}>Online Goride Registration Count</Text>
+                  <Text style={styles.count}>{this.state.value}</Text>
+                </View>
+              </Card>
+
     )
   }
 }
