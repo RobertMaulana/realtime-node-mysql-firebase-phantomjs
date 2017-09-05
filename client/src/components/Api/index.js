@@ -56,14 +56,38 @@ class Api extends Component {
             </Right>
           </ListItem>
           <Separator bordered>
-            <Text>MIDFIELD</Text>
+            <Text>GORIDE GOPROTEKSI</Text>
           </Separator>
           <ListItem>
             <Left>
-              <Text>Aaron Bennet</Text>
+              <Text>https://services.pasarpolis.com</Text>
             </Left>
             <Right>
-              <Icon name="wifi" />
+              <Icon name="wifi" style={{fontSize: 20, color: color}}/>
+            </Right>
+          </ListItem>
+          <ListItem>
+            <Left>
+              <Text>https://lab.pasarpolis.com</Text>
+            </Left>
+            <Right>
+              <Icon name="wifi" style={{fontSize: 20, color: color}}/>
+            </Right>
+          </ListItem>
+          <ListItem>
+            <Left>
+              <Text>https://gp.pasarpolis.com</Text>
+            </Left>
+            <Right>
+              <Icon name="wifi" style={{fontSize: 20, color: color}}/>
+            </Right>
+          </ListItem>
+          <ListItem>
+            <Left>
+              <Text>https://api.pasarpolis.com</Text>
+            </Left>
+            <Right>
+              <Icon name="wifi" style={{fontSize: 20, color: color}}/>
             </Right>
           </ListItem>
         </Content>

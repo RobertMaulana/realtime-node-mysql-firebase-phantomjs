@@ -11,67 +11,51 @@ let express           = require('express'),
     profile_id,
     last_count        = 0, //this variable is to check previous count value
     sendMail          = 0,
-    connection        = mysql.createConnection({
-      host      : 'localhost',
-      user      : 'root',
-      password  : '', //put your own mysql pwd
-      database  : 'pasarpolis', //put your database name
-      port      : 3306
-    }),
     POLLING_INTERVAL  = 1000,
     pollingTimer;
 
-    var transporter = nodemailer.createTransport({
-     service: 'gmail',
-     auth: {
-            user: 'maulana.robert.mr@gmail.com',
-            pass: 'pgg773sG56'
-        }
-    });
-    const mailOptions = {
-      from    : 'maulana.robert.mr@gmail.com', // sender address
-      to      : 'maulana.robert.mr@gmail.com', // list of receivers
-      subject : 'Server down', // Subject line
-      html    : '<p>Sepertinya server mega down</p>'// plain text body
-    };
+const db          = require('./config/connection'),
+      sequelize   = require('sequelize');
 
-    var config = {
-    apiKey           : "AIzaSyAwJipkhOuKpMeDLYNZlGEsxtCbnxImDS0",
-    authDomain       : "pasarpolis-api-monitoring.firebaseapp.com",
-    databaseURL      : "https://pasarpolis-api-monitoring.firebaseio.com",
-    projectId        : "pasarpolis-api-monitoring",
-    storageBucket    : "pasarpolis-api-monitoring.appspot.com",
-    messagingSenderId: "987718083796"
-  };
-  var auth = firebase.initializeApp(config);
-  var query = firebase.database(auth).ref();
+let transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+        user: 'maulana.robert.mr@gmail.com',
+        pass: 'pgg773sG56'
+    }
+});
+
+let config = {
+  apiKey           : "AIzaSyAwJipkhOuKpMeDLYNZlGEsxtCbnxImDS0",
+  authDomain       : "pasarpolis-api-monitoring.firebaseapp.com",
+  databaseURL      : "https://pasarpolis-api-monitoring.firebaseio.com",
+  projectId        : "pasarpolis-api-monitoring",
+  storageBucket    : "pasarpolis-api-monitoring.appspot.com",
+  messagingSenderId: "987718083796"
+};
+let auth = firebase.initializeApp(config);
+let query = firebase.database(auth).ref();
 
 app.use(cors())
 
 // If there is an error connecting to the database
-connection.connect(function(err) {
-  // connected! (unless `err` is set)
-  console.log(err);
-});
+db.authenticate().then(function(errors) { console.log(errors) });
 
 // creating the server ( localhost:8000 )
 const conn = app.listen(3000);
 const io = socket(conn);
 
 // on server started we can load our client.html page
-// function handler(req, res) {
-  app.get('/', (req, res) => {
-    fs.readFile(__dirname + '/client.html', function(err, data) {
-        if (err) {
-          res.writeHead(500);
-          return res.end('Error loading client.html');
-        }
-        res.writeHead(200);
-        res.end(data);
-    });
-  })
-
-// }
+app.get('/', (req, res) => {
+  fs.readFile(__dirname + '/client.html', function(err, data) {
+      if (err) {
+        res.writeHead(500);
+        return res.end('Error loading client.html');
+      }
+      res.writeHead(200);
+      res.end(data);
+  });
+})
 
 /*
 * HERE IT IS THE COOL PART
@@ -80,59 +64,134 @@ const io = socket(conn);
 * the value has changed.
 * Polling the database after a constant interval
 */
-var pollingLoop = function() {
-  sql = "SELECT count(id) as c FROM goproteksi";
-  // Doing the database query
-  var query = connection.query(sql),
-      users = []; // this array will contain the result of our db query
-  // setting the query listeners
-  query.on('error', function(err) {
-    // Handle error, and 'end' event will be emitted after this as well
-    console.log(err);
-    updateSockets(err);
-  }).on('result', function(count) {
-    // it fills our array looping on each user row inside the db
-    users.push(count);
-    // loop on itself only if there are sockets still connected
+let pollingLoop = function() {
+
+  let onlineReg   = [];
+  let sqlOnline   = "SELECT count(id) as countRegOnline FROM goproteksi WHERE origin = 'app'";
+
+  db.query(sqlOnline,{ bind: ['active'], type: sequelize.QueryTypes.SELECT })
+    .then(projects => {
+
+      onlineReg.push(projects[0].countRegOnline);
+
     if (connectionsArray.length) {
+
       pollingTimer = setTimeout(pollingLoop, POLLING_INTERVAL);
 
-      updateSockets({
-        count: count.c
+      updateOnlineRegistration({
+        count: projects[0].countRegOnline
       });
-      request("http://121.52.49.174:9119", function(error, response, body) {
-        updateStatusMega({
-          statusCode: response.statusCode
-        });
-      });
+
     }
+  }).catch(err => {
+
+    console.log(err);
+    updateOnlineRegistration(err);
+
   })
+
+  requestAPI()
+
 };
+
+let pollingLoopOffline = function() {
+  
+    let offlineReg   = [];
+    let sqlOffline  = "SELECT count(id) as countRegOffline FROM goproteksi WHERE origin = 'offline'";
+  
+    db.query(sqlOffline,{ bind: ['active'], type: sequelize.QueryTypes.SELECT })
+    .then(projects => {
+  
+      offlineReg.push(projects[0].countRegOffline);
+  
+    if (connectionsArray.length) {
+  
+      pollingTimer = setTimeout(pollingLoopOffline, POLLING_INTERVAL);
+  
+      updateOfflineRegistration({
+        count: projects[0].countRegOffline
+      });
+  
+    }
+    }).catch(err => {
+  
+      console.log(err);
+      updateOfflineRegistration(err);
+  
+    })
+  
+  };
+
+function requestAPI() {
+  request("http://121.52.49.174:9119", function(error, response, body) {
+    updateStatusMega({
+      statusCode: response.statusCode
+    });
+  });
+
+  request("https://services.pasarpolis.com", function(error, response, body) {
+    updateStatusServices({
+      statusCode: response.statusCode
+    });
+  });
+
+  request("https://lab.pasarpolis.com", function(error, response, body) {
+    updateStatusLab({
+      statusCode: response.statusCode
+    });
+  });
+
+  request("https://gp.pasarpolis.com", function(error, response, body) {
+    updateStatusGp({
+      statusCode: response.statusCode
+    });
+  });
+
+  request("https://api.pasarpolis.com", function(error, response, body) {
+    updateStatusApi({
+      statusCode: response.statusCode
+    });
+  });
+}
 
 // creating a new websocket to keep the content updated without any AJAX request
 io.sockets.on('connection', function(socket) {
-  //This variable is passed via the client at the time of socket //connection, see "io.connect(..." line in client.html
+
+  //This letiable is passed via the client at the time of socket //connection, see "io.connect(..." line in client.html
   profile_id = socket.handshake.query.profile_id;
+
   console.log('Number of connections:' + connectionsArray.length);
+
   // starting the loop only if at least there is one user connected
   if (!connectionsArray.length) {
+
     pollingLoop();
+    pollingLoopOffline();
+
   }
+
   socket.on('disconnect', function() {
-    var socketIndex = connectionsArray.indexOf(socket);
+
+    let socketIndex = connectionsArray.indexOf(socket);
+
     console.log('socket = ' + socketIndex + ' disconnected');
+
     if (socketIndex >= 0) {
+
       connectionsArray.splice(socketIndex, 1);
+
     }
+
   });
+
   console.log('A new socket is connected!');
   connectionsArray.push(socket);
 });
 
-var updateStatusMega = function(data) {
+let updateStatusMega = function(data) {
   // console.log(data.statusCode);
-  var query = firebase.database(auth).ref('API');
-  var mega = query.child('Mega');
+  let query = firebase.database(auth).ref('API');
+  let mega = query.child('Mega');
 
   if (data.statusCode !== 200) {
     mega.once('value', function(snap) {
@@ -144,6 +203,13 @@ var updateStatusMega = function(data) {
     if (sendMail > 1) {
       return
     }else {
+      const mailOptions = {
+        from    : 'maulana.robert.mr@gmail.com',
+        to      : 'maulana.robert.mr@gmail.com',
+        subject : 'Server down',
+        html    : '<p>Sepertinya server mega down</p>'
+      };
+
       transporter.sendMail(mailOptions, function (err, info) {
          if(err) {
            console.log(err)
@@ -160,10 +226,179 @@ var updateStatusMega = function(data) {
 
 }
 
-var updateSockets = function(data) {
+let updateStatusServices = function(data) {
+  // console.log(data.statusCode);
+  let query = firebase.database(auth).ref('API');
+  let mega = query.child('Goproteksi');
+
+  if (data.statusCode !== 200) {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "services": data.statusCode })
+    })
+
+    sendMail++;
+
+    if (sendMail > 1) {
+      return
+    }else {
+      const mailOptions = {
+        from    : 'maulana.robert.mr@gmail.com',
+        to      : 'maulana.robert.mr@gmail.com',
+        subject : 'Server https://services.pasarpolis.com down',
+        html    : '<p>Sepertinya server https://services.pasarpolis.com down</p>'
+      };
+
+      transporter.sendMail(mailOptions, function (err, info) {
+         if(err) {
+           console.log(err)
+         }else {
+           console.log(info);
+         }
+      });
+    }
+  }else {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "services": data.statusCode })
+    })
+  }
+
+}
+
+let updateStatusLab = function(data) {
+  // console.log(data.statusCode);
+  let query = firebase.database(auth).ref('API');
+  let mega = query.child('Goproteksi');
+
+  if (data.statusCode !== 200) {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "lab": data.statusCode })
+    })
+
+    sendMail++;
+
+    if (sendMail > 1) {
+      return
+    }else {
+
+      const mailOptions = {
+        from    : 'maulana.robert.mr@gmail.com',
+        to      : 'maulana.robert.mr@gmail.com',
+        subject : 'Server https://lab.pasarpolis.com down',
+        html    : '<p>Sepertinya server https://lab.pasarpolis.com down</p>'
+      };
+
+      transporter.sendMail(mailOptions, function (err, info) {
+         if(err) {
+           console.log(err)
+         }else {
+           console.log(info);
+         }
+      });
+
+    }
+  }else {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "lab": data.statusCode })
+    })
+  }
+
+}
+
+let updateStatusGp = function(data) {
+  // console.log(data.statusCode);
+  let query = firebase.database(auth).ref('API');
+  let mega = query.child('Goproteksi');
+
+  if (data.statusCode !== 200) {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "gp": data.statusCode })
+    })
+
+    sendMail++;
+
+    if (sendMail > 1) {
+      return
+    }else {
+
+      const mailOptions = {
+        from    : 'maulana.robert.mr@gmail.com',
+        to      : 'maulana.robert.mr@gmail.com',
+        subject : 'Server https://gp.pasarpolis.com down',
+        html    : '<p>Sepertinya server https://gp.pasarpolis.com down</p>'
+      };
+
+      transporter.sendMail(mailOptions, function (err, info) {
+         if(err) {
+           console.log(err)
+         }else {
+           console.log(info);
+         }
+      });
+
+    }
+  }else {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "gp": data.statusCode })
+    })
+  }
+
+}
+
+let updateStatusApi = function(data) {
+  // console.log(data.statusCode);
+  let query = firebase.database(auth).ref('API');
+  let mega = query.child('Goproteksi');
+
+  if (data.statusCode !== 200) {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "api": data.statusCode })
+    })
+
+    sendMail++;
+
+    if (sendMail > 1) {
+      return
+    }else {
+
+      const mailOptions = {
+        from    : 'maulana.robert.mr@gmail.com',
+        to      : 'maulana.robert.mr@gmail.com',
+        subject : 'Server https://api.pasarpolis.com down',
+        html    : '<p>Sepertinya server https://api.pasarpolis.com down</p>'
+      };
+
+      transporter.sendMail(mailOptions, function (err, info) {
+         if(err) {
+           console.log(err)
+         }else {
+           console.log(info);
+         }
+      });
+
+    }
+  }else {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "api": data.statusCode })
+    })
+  }
+
+}
+
+let updateOnlineRegistration = function(data) {
   if (last_count != data.count) {
+    let query = firebase.database(auth).ref("Data-Registration");
     query.once('value', function(snap) {
       snap.ref.update({ "online-registration-today": data.count })
+    })
+  }
+  last_count = data.count;
+};
+
+let updateOfflineRegistration = function(data) {
+  if (last_count != data.count) {
+    let query = firebase.database(auth).ref("Data-Registration");
+    query.once('value', function(snap) {
+      snap.ref.update({ "offline-registration-today": data.count })
     })
   }
   last_count = data.count;

@@ -78,6 +78,7 @@ class Dashboard extends Component {
                         y: Math.random()
                     });
                 }
+                console.log(data);
                 return data;
             }())
         }]
