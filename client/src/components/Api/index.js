@@ -1,49 +1,71 @@
 import React, {Component} from 'react';
-import { Container, Header, Content, Card, CardItem, Thumbnail, Text, Button, Icon, Left, Body, Right } from 'native-base';
+import { Container, Header, Content, List, ListItem, Text, Separator, Icon, Left, Right, Switch } from 'native-base';
 import ResponsiveImage from 'react-native-responsive-image';
+import * as firebase from "firebase";
+
+var config = {
+  apiKey           : "AIzaSyAwJipkhOuKpMeDLYNZlGEsxtCbnxImDS0",
+  authDomain       : "pasarpolis-api-monitoring.firebaseapp.com",
+  databaseURL      : "https://pasarpolis-api-monitoring.firebaseio.com",
+  projectId        : "pasarpolis-api-monitoring",
+  storageBucket    : "pasarpolis-api-monitoring.appspot.com",
+  messagingSenderId: "987718083796"
+};
 
 class Api extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      statusCode: 0
     }
+    if (!firebase.apps.length) {
+      this.auth = firebase.initializeApp(config);
+    }
+    console.ignoredYellowBox = [
+        2000
+    ]
+  }
+
+  componentWillMount() {
+    let query = firebase.database(this.auth).ref().child('API');
+    let self = this;
+    query.on('value', function(snap) {
+      self.setState({statusCode: snap.val()["Mega"]["statusCode"]})
+    })
   }
 
   render() {
+    let color = '';
+    if (this.state.statusCode === 200) {
+      color = 'green'
+    }else {
+      color = 'red'
+    }
     return(
       <Container>
         <Content>
-          <Card>
-            <CardItem>
-              <Left>
-                <Thumbnail source={{uri: 'https://www.anychart.com/_design/img/upload/plugins/nodejs-logo.png'}} />
-                <Body>
-                  <Text>NativeBase</Text>
-                  <Text note>GeekyAnts</Text>
-                </Body>
-              </Left>
-            </CardItem>
-            <CardItem cardBody style={{flex: 1, justifyContent: 'center'}}>
-              <ResponsiveImage source={{uri: 'https://www.anychart.com/_design/img/upload/plugins/nodejs-logo.png'}} initWidth="138" initHeight="138"/>
-            </CardItem>
-            <CardItem>
-              <Left>
-                <Button transparent>
-                  <Icon active name="thumbs-up" />
-                  <Text>12 Likes</Text>
-                </Button>
-              </Left>
-              <Body>
-                <Button transparent>
-                  <Icon active name="chatbubbles" />
-                  <Text>4 Comments</Text>
-                </Button>
-              </Body>
-              <Right>
-                <Text>11h ago</Text>
-              </Right>
-            </CardItem>
-          </Card>
+          <Separator bordered>
+            <Text>MEGA</Text>
+          </Separator>
+          <ListItem >
+            <Left>
+              <Text>http://121.52.49.174:9119</Text>
+            </Left>
+            <Right>
+              <Icon name="wifi" style={{fontSize: 20, color: color}}/>
+            </Right>
+          </ListItem>
+          <Separator bordered>
+            <Text>MIDFIELD</Text>
+          </Separator>
+          <ListItem>
+            <Left>
+              <Text>Aaron Bennet</Text>
+            </Left>
+            <Right>
+              <Icon name="wifi" />
+            </Right>
+          </ListItem>
         </Content>
       </Container>
     )

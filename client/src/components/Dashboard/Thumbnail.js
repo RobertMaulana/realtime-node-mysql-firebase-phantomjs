@@ -48,7 +48,7 @@ class ThumbnailApp extends Component {
     let query = firebase.database(this.auth).ref().child('online-registration-today');
     let self = this;
     query.on('value', function(snap) {
-      self.setState({value: snap.val()["online-registration-today"]})
+      self.setState({value: snap.val()})
     })
   }
 

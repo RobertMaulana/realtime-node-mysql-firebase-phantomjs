@@ -1,13 +1,16 @@
-let express = require('express'),
-    app = express(),
-    socket = require('socket.io'),
-    cors        = require('cors'),
-    fs = require('fs'),
-    firebase = require('firebase'),
+let express           = require('express'),
+    app               = express(),
+    socket            = require('socket.io'),
+    cors              = require('cors'),
+    fs                = require('fs'),
+    firebase          = require('firebase'),
     mysql             = require('mysql'),
+    nodemailer        = require('nodemailer'),
     connectionsArray  = [],
+    request           = require("request"),
     profile_id,
     last_count        = 0, //this variable is to check previous count value
+    sendMail          = 0,
     connection        = mysql.createConnection({
       host      : 'localhost',
       user      : 'root',
@@ -18,6 +21,20 @@ let express = require('express'),
     POLLING_INTERVAL  = 1000,
     pollingTimer;
 
+    var transporter = nodemailer.createTransport({
+     service: 'gmail',
+     auth: {
+            user: 'maulana.robert.mr@gmail.com',
+            pass: 'pgg773sG56'
+        }
+    });
+    const mailOptions = {
+      from    : 'maulana.robert.mr@gmail.com', // sender address
+      to      : 'maulana.robert.mr@gmail.com', // list of receivers
+      subject : 'Server down', // Subject line
+      html    : '<p>Sepertinya server mega down</p>'// plain text body
+    };
+
     var config = {
     apiKey           : "AIzaSyAwJipkhOuKpMeDLYNZlGEsxtCbnxImDS0",
     authDomain       : "pasarpolis-api-monitoring.firebaseapp.com",
@@ -27,7 +44,7 @@ let express = require('express'),
     messagingSenderId: "987718083796"
   };
   var auth = firebase.initializeApp(config);
-  var query = firebase.database(auth).ref().child('online-registration-today');
+  var query = firebase.database(auth).ref();
 
 app.use(cors())
 
@@ -83,6 +100,11 @@ var pollingLoop = function() {
       updateSockets({
         count: count.c
       });
+      request("http://121.52.49.174:9119", function(error, response, body) {
+        updateStatusMega({
+          statusCode: response.statusCode
+        });
+      });
     }
   })
 };
@@ -106,6 +128,37 @@ io.sockets.on('connection', function(socket) {
   console.log('A new socket is connected!');
   connectionsArray.push(socket);
 });
+
+var updateStatusMega = function(data) {
+  // console.log(data.statusCode);
+  var query = firebase.database(auth).ref('API');
+  var mega = query.child('Mega');
+
+  if (data.statusCode !== 200) {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "statusCode": data.statusCode })
+    })
+
+    sendMail++;
+
+    if (sendMail > 1) {
+      return
+    }else {
+      transporter.sendMail(mailOptions, function (err, info) {
+         if(err) {
+           console.log(err)
+         }else {
+           console.log(info);
+         }
+      });
+    }
+  }else {
+    mega.once('value', function(snap) {
+      snap.ref.update({ "statusCode": data.statusCode })
+    })
+  }
+
+}
 
 var updateSockets = function(data) {
   if (last_count != data.count) {
